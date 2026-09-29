@@ -82,6 +82,13 @@ int main()
         return 1;
     }
 
+    std::string response { "HTTP/1.1 200 OK\r\n\r\n" };
+    if (send(client.fd(), response.c_str(), response.size(), 0) == -1)
+    {
+        std::cerr << FailedError::formattedResponse("send", errno);
+        return 1;
+    }
+
     std::cout << "Client connected\n";
     return 0;
 }
