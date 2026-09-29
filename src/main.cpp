@@ -1,62 +1,87 @@
-#include <iostream>
-#include <cstdlib>
-#include <string>
-#include <cstring>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#include "FailedError.h"
+#include "Settings.h"
+#include "Socket.h"
 #include <arpa/inet.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <format>
+#include <iostream>
+#include <memory>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <string>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-int main(int argc, char **argv) {
-  // Flush after every std::cout / std::cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
-  
-  // You can use print statements as follows for debugging, they'll be visible when running tests.
-  std::cout << "Logs from your program will appear here!\n";
+int main()
+{
+    // Flush after every std::cout / std::cerr
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
 
-  // TODO: Uncomment the code below to pass the first stage
-  //
-  // int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  // if (server_fd < 0) {
-  //  std::cerr << "Failed to create server socket\n";
-  //  return 1;
-  // }
-  //
-  // // Since the tester restarts your program quite often, setting SO_REUSEADDR
-  // // ensures that we don't run into 'Address already in use' errors
-  // int reuse = 1;
-  // if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-  //   std::cerr << "setsockopt failed\n";
-  //   return 1;
-  // }
-  //
-  // struct sockaddr_in server_addr;
-  // server_addr.sin_family = AF_INET;
-  // server_addr.sin_addr.s_addr = INADDR_ANY;
-  // server_addr.sin_port = htons(4221);
-  //
-  // if (bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
-  //   std::cerr << "Failed to bind to port 4221\n";
-  //   return 1;
-  // }
-  //
-  // int connection_backlog = 5;
-  // if (listen(server_fd, connection_backlog) != 0) {
-  //   std::cerr << "listen failed\n";
-  //   return 1;
-  // }
-  //
-  // struct sockaddr_in client_addr;
-  // int client_addr_len = sizeof(client_addr);
-  //
-  // std::cout << "Waiting for a client to connect...\n";
-  //
-  // accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
-  // std::cout << "Client connected\n";
-  //
-  // close(server_fd);
+    // You can use print statements as follows for debugging, they'll be visible
+    // when running tests.
+    std::cout << "Logs from your program will appear here!\n";
+    addrinfo hints {};
+    hints.ai_family = AF_INET6;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
 
-  return 0;
+    auto addrinfoDelete { [](addrinfo* addr) { freeaddrinfo(addr); } };
+    std::unique_ptr<addrinfo, decltype(addrinfoDelete)> info {};
+    if (int result { getaddrinfo(nullptr, Settings::port.c_str(), &hints, std::out_ptr(info)) }; result != 0)
+    {
+        std::cerr << std::format("getaddrinfo() failed. {}\n", gai_strerror(result));
+        return 1;
+    }
+
+    Socket server { socket(info->ai_family, info->ai_socktype, info->ai_protocol) };
+    if (server.fd() == -1)
+    {
+        std::cerr << FailedError::formattedResponse("socket", errno);
+        return 1;
+    }
+
+    int reuse { 1 };
+    if (setsockopt(server.fd(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
+    {
+        std::cerr << FailedError::formattedResponse("setsockopt", errno);
+        return 1;
+    }
+
+    int dualStack { 0 };
+    if (setsockopt(server.fd(), IPPROTO_IPV6, IPV6_V6ONLY, &dualStack, sizeof(dualStack)) == -1)
+    {
+        std::cerr << FailedError::formattedResponse("setsockopt", errno);
+        return 1;
+    }
+
+    if (bind(server.fd(), info->ai_addr, info->ai_addrlen) == -1)
+    {
+        std::cerr << FailedError::formattedResponse("bind", errno);
+        return 1;
+    }
+
+    if (listen(server.fd(), Settings::connectionBacklog) == -1)
+    {
+        std::cerr << FailedError::formattedResponse("listen", errno);
+        return 1;
+    }
+
+    sockaddr_storage clientInfo {};
+    socklen_t clientSize { sizeof(clientInfo) };
+
+    std::cout << "Waiting for a client to connect...\n";
+
+    Socket client { accept(server.fd(), reinterpret_cast<sockaddr*>(&clientInfo), &clientSize) };
+    if (client.fd() == -1)
+    {
+        std::cerr << FailedError::formattedResponse("accept", errno);
+        return 1;
+    }
+
+    std::cout << "Client connected\n";
+    return 0;
 }
