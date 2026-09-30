@@ -1,6 +1,8 @@
 #include "HTTP.h"
 #include <optional>
+#include <string>
 #include <string_view>
+#include <utility>
 
 std::optional<HTTP::RequestLine> HTTP::parseRequestLine(std::string_view requestLine)
 {
@@ -33,14 +35,32 @@ std::optional<HTTP::Request> HTTP::parseRequest(std::string_view URL)
     return HTTP::Request { .requestLine { std::move(*requestLine) } };
 }
 
-std::string HTTP::formulateResponse(const Request& request)
+std::string HTTP::serialize(const Response& response)
 {
-    std::string response { "HTTP/1.1" };
-    if (request.requestLine.target != "/")
-        response += " 404 Not Found";
-    else
-        response += " 200 OK";
+    std::string resp { "HTTP/1.1 " };
+    resp += HTTP::getStatus(response.status);
+    resp += "\r\n";
 
-    response += "\r\n\r\n";
-    return response;
+    for (const auto& [key, value] : response.headers)
+        resp += key + ": " + value + "\r\n";
+
+    resp += "\r\n" + response.body;
+    return resp;
+}
+
+HTTP::Response HTTP::route(const Request& request)
+{
+    std::string_view route { request.requestLine.target };
+    if (route == "/")
+        return { .status = Status::OK, .body {}, .headers {} };
+
+    if (route.starts_with("/echo/"))
+    {
+        std::string_view body { route.substr(6) };
+        return { .status = Status::OK,
+                 .body { body },
+                 .headers { { "Content-Type", "text/plain" }, { "Content-Length", std::to_string(body.size()) } } };
+    }
+
+    return { .status = Status::NOT_FOUND, .body {}, .headers {} };
 }

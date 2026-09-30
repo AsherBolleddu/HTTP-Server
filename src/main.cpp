@@ -44,33 +44,33 @@ int main()
     Socket server { socket(info->ai_family, info->ai_socktype, info->ai_protocol) };
     if (server.fd() == -1)
     {
-        std::cerr << FailedError::formattedResponse("socket", errno);
+        std::cerr << FailedError::formattedError("socket", errno);
         return 1;
     }
 
     int reuse { 1 };
     if (setsockopt(server.fd(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
     {
-        std::cerr << FailedError::formattedResponse("setsockopt", errno);
+        std::cerr << FailedError::formattedError("setsockopt", errno);
         return 1;
     }
 
     int dualStack { 0 };
     if (setsockopt(server.fd(), IPPROTO_IPV6, IPV6_V6ONLY, &dualStack, sizeof(dualStack)) == -1)
     {
-        std::cerr << FailedError::formattedResponse("setsockopt", errno);
+        std::cerr << FailedError::formattedError("setsockopt", errno);
         return 1;
     }
 
     if (bind(server.fd(), info->ai_addr, info->ai_addrlen) == -1)
     {
-        std::cerr << FailedError::formattedResponse("bind", errno);
+        std::cerr << FailedError::formattedError("bind", errno);
         return 1;
     }
 
     if (listen(server.fd(), Settings::connectionBacklog) == -1)
     {
-        std::cerr << FailedError::formattedResponse("listen", errno);
+        std::cerr << FailedError::formattedError("listen", errno);
         return 1;
     }
     sockaddr_storage clientInfo {};
@@ -83,7 +83,7 @@ int main()
         Socket client { accept(server.fd(), reinterpret_cast<sockaddr*>(&clientInfo), &clientSize) };
         if (client.fd() == -1)
         {
-            std::cerr << FailedError::formattedResponse("accept", errno);
+            std::cerr << FailedError::formattedError("accept", errno);
             return 1;
         }
 
@@ -97,9 +97,11 @@ int main()
             continue;
         }
 
-        if (!client.sendAll(HTTP::formulateResponse(*httpRequest)))
+        auto response { HTTP::route(*httpRequest) };
+        auto httpResponse { HTTP::serialize(response) };
+        if (!client.sendAll(httpResponse))
         {
-            std::cerr << FailedError::formattedResponse("send", errno);
+            std::cerr << FailedError::formattedError("send", errno);
             continue;
         }
     }

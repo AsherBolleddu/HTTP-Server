@@ -5,5 +5,5 @@
 
 namespace FailedError
 {
-    std::string formattedResponse(std::string_view function, int error);
+    std::string formattedError(std::string_view function, int error);
 } // namespace FailedError
