@@ -1,7 +1,10 @@
 #include "HTTP.h"
+#include "Helper.h"
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 
 std::optional<HTTP::RequestLine> HTTP::parseRequestLine(std::string_view requestLine)
@@ -19,6 +22,32 @@ std::optional<HTTP::RequestLine> HTTP::parseRequestLine(std::string_view request
                                .version { requestLine.substr(targetLen + 1) } };
 }
 
+std::optional<std::unordered_map<std::string, std::string>> HTTP::parseHeaders(std::string_view headerLine)
+{
+    using namespace std::string_view_literals;
+    std::unordered_map<std::string, std::string> headers;
+    for (const auto& line : std::ranges::views::split(headerLine, "\r\n"sv))
+    {
+        std::string_view sv { line };
+        auto colon { sv.find(':') };
+        if (colon == std::string_view::npos)
+            return {};
+
+        std::string key { Helper::toLower(sv.substr(0, colon)) };
+        std::string_view value { sv.substr(colon + 1) };
+        auto firstNonSpace { value.find_first_not_of(' ') };
+        if (firstNonSpace != std::string_view::npos)
+            value.remove_prefix(firstNonSpace);
+        else
+            value = {};
+
+        // std::cout << key << ": " << value << '\n';
+        headers[std::move(key)] = std::string { value };
+    }
+
+    return headers;
+}
+
 // GET /index.html HTTP/1.1\r\nHost: localhost:4221\r\nUser-Agent: curl/7.64.1\r\nAccept: */*\r\n\r\n
 std::optional<HTTP::Request> HTTP::parseRequest(std::string_view URL)
 {
@@ -29,10 +58,12 @@ std::optional<HTTP::Request> HTTP::parseRequest(std::string_view URL)
         return {};
 
     std::optional<HTTP::RequestLine> requestLine { parseRequestLine(URL.substr(0, requestLineEnd)) };
-    if (!requestLine)
+    std::optional<std::unordered_map<std::string, std::string>> headers { parseHeaders(
+        URL.substr(requestLineEnd + 2, headerEnd - (requestLineEnd + 2))) };
+    if (!requestLine || !headers)
         return {};
 
-    return HTTP::Request { .requestLine { std::move(*requestLine) } };
+    return HTTP::Request { .requestLine { std::move(*requestLine) }, .headers { std::move(*headers) } };
 }
 
 std::string HTTP::serialize(const Response& response)
@@ -60,6 +91,18 @@ HTTP::Response HTTP::route(const Request& request)
         return { .status = Status::OK,
                  .body { body },
                  .headers { { "Content-Type", "text/plain" }, { "Content-Length", std::to_string(body.size()) } } };
+    }
+
+    if (route.starts_with("/user-agent"))
+    {
+        const auto& headers { request.headers };
+        if (auto search { headers.find("user-agent") }; search != headers.end())
+        {
+            return { .status = Status::OK,
+                     .body { search->second },
+                     .headers { { "Content-Type", "text/plain" },
+                                { "Content-Length", std::to_string(search->second.size()) } } };
+        }
     }
 
     return { .status = Status::NOT_FOUND, .body {}, .headers {} };

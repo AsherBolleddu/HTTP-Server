@@ -96,9 +96,12 @@ int main()
             std::cerr << "Malformed request\n";
             continue;
         }
+        // std::cout << *httpRequest << '\n';
 
         auto response { HTTP::route(*httpRequest) };
+        // std::cout << response << '\n';
         auto httpResponse { HTTP::serialize(response) };
+        // std::cout << httpResponse << '\n';
         if (!client.sendAll(httpResponse))
         {
             std::cerr << FailedError::formattedError("send", errno);
