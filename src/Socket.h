@@ -1,14 +1,20 @@
 #pragma once
 
-class Socket {
+#include <string>
+#include <string_view>
+class Socket
+{
 private:
-  int m_fd{};
+    int m_fd {};
 
 public:
-  explicit Socket(int fd);
-  int fd() { return m_fd; }
+    explicit Socket(int fd);
+    int fd() const { return m_fd; }
 
-  Socket(const Socket &) = delete;
-  Socket &operator=(const Socket &) = delete;
-  ~Socket();
+    std::string recvAll() const;
+    bool sendAll(std::string_view bytes) const;
+
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
+    ~Socket();
 };

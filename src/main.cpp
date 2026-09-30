@@ -1,8 +1,10 @@
 #include "FailedError.h"
+#include "HTTP.h"
 #include "Settings.h"
 #include "Socket.h"
 #include <arpa/inet.h>
 #include <cerrno>
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -20,6 +22,8 @@ int main()
     // Flush after every std::cout / std::cerr
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
+
+    std::signal(SIGPIPE, SIG_IGN);
 
     // You can use print statements as follows for debugging, they'll be visible
     // when running tests.
@@ -69,26 +73,36 @@ int main()
         std::cerr << FailedError::formattedResponse("listen", errno);
         return 1;
     }
-
     sockaddr_storage clientInfo {};
     socklen_t clientSize { sizeof(clientInfo) };
 
-    std::cout << "Waiting for a client to connect...\n";
-
-    Socket client { accept(server.fd(), reinterpret_cast<sockaddr*>(&clientInfo), &clientSize) };
-    if (client.fd() == -1)
+    while (true)
     {
-        std::cerr << FailedError::formattedResponse("accept", errno);
-        return 1;
+        std::cout << "Waiting for a client to connect...\n";
+
+        Socket client { accept(server.fd(), reinterpret_cast<sockaddr*>(&clientInfo), &clientSize) };
+        if (client.fd() == -1)
+        {
+            std::cerr << FailedError::formattedResponse("accept", errno);
+            return 1;
+        }
+
+        std::cout << "Client connected\n";
+
+        auto URL { client.recvAll() };
+        auto httpRequest { HTTP::parseRequest(URL) };
+        if (!httpRequest)
+        {
+            std::cerr << "Malformed request\n";
+            continue;
+        }
+
+        if (!client.sendAll(HTTP::formulateResponse(*httpRequest)))
+        {
+            std::cerr << FailedError::formattedResponse("send", errno);
+            continue;
+        }
     }
 
-    std::string response { "HTTP/1.1 200 OK\r\n\r\n" };
-    if (send(client.fd(), response.c_str(), response.size(), 0) == -1)
-    {
-        std::cerr << FailedError::formattedResponse("send", errno);
-        return 1;
-    }
-
-    std::cout << "Client connected\n";
     return 0;
 }
