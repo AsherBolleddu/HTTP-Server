@@ -93,6 +93,11 @@ void Server::handleClient(const Socket& client) const
             continue;
         }
 
+        auto search { req->headers.find("connection") };
+        bool connectionFound { search != req->headers.end() && search->second == "close" };
+        if (connectionFound)
+            keepAlive = false;
+
         std::size_t contentLength {};
         if (auto found { req->headers.find("content-length") }; found != req->headers.end())
         {
@@ -121,9 +126,9 @@ void Server::handleClient(const Socket& client) const
         }
 
         auto resp { HTTP::route(*req, m_config.directory) };
-        sendResponse(client, resp);
+        if (connectionFound)
+            resp.headers["Connection"] = "close";
 
-        if (auto search { req->headers.find("connection") }; search != req->headers.end() && search->second == "close")
-            keepAlive = false;
+        sendResponse(client, resp);
     }
 }
