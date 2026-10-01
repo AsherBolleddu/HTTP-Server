@@ -1,5 +1,6 @@
 #include "HTTP.h"
 #include "Handler.h"
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <optional>
@@ -31,9 +32,7 @@ std::optional<std::unordered_map<std::string, std::string>> HTTP::parseHeaders(s
 
     auto toLower { [](std::string_view sv) {
         std::string out { sv };
-        for (char& c : out)
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-
+        std::ranges::transform(out, out.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return out;
     } };
 

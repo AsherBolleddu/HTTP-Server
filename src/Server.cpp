@@ -84,13 +84,13 @@ void Server::handleClient(const Socket& client) const
     {
         auto httpReq { client.recvAll() };
         if (httpReq.empty())
-            continue;
+            break;
 
         auto req { HTTP::parseRequest(httpReq) };
         if (!req)
         {
             sendResponse(client, badRequest);
-            continue;
+            break;
         }
 
         auto search { req->headers.find("connection") };
@@ -121,7 +121,7 @@ void Server::handleClient(const Socket& client) const
             std::size_t missing { contentLength - req->body.size() };
             std::string rest { client.recvExact(missing) };
             if (rest.size() != missing)
-                continue;
+                break;
             req->body += rest;
         }
 
