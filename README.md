@@ -1,5 +1,3 @@
-[![progress-banner](https://backend.codecrafters.io/progress/http-server/fbc814db-b93d-478f-a8a8-637a5335dc28)](https://app.codecrafters.io/users/AsherBolleddu?r=2qF)
-
 # HTTP Server in C++23
 
 A multithreaded HTTP/1.1 server written from scratch on POSIX sockets, with no networking or HTTP libraries. Built as a solution to the CodeCrafters ["Build Your Own HTTP Server"](https://app.codecrafters.io/courses/http-server/overview) challenge.
@@ -20,7 +18,7 @@ A multithreaded HTTP/1.1 server written from scratch on POSIX sockets, with no n
 
 - Linux or macOS
 - CMake 3.13 or newer
-- A compiler with C++23 library support (the code uses `std::out_ptr` and `std::string_view::contains`)
+- - A compiler with C++23 library support (tested with Apple clang 21 on macOS arm64; the code uses `std::out_ptr` and `std::string_view::contains`)
 - [vcpkg](https://github.com/microsoft/vcpkg), with `VCPKG_ROOT` set (it supplies zlib)
 
 ### Build and run
