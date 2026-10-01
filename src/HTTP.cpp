@@ -102,7 +102,7 @@ HTTP::Response HTTP::route(const Request& request, std::string_view directory)
         return Handler::root();
 
     if (route.starts_with("/echo/"))
-        return Handler::echo(route.substr(6));
+        return Handler::echo(route.substr(6), request.headers);
 
     if (route.starts_with("/user-agent"))
         return Handler::userAgent(request.headers);
@@ -118,7 +118,7 @@ HTTP::Response HTTP::route(const Request& request, std::string_view directory)
                 return Handler::getFile(path);
 
             if (method == "POST")
-                return Handler::postFile(path, request.body);
+                return Handler::postFile(request.body, path);
         }
     }
 

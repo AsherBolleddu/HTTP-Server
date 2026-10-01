@@ -6,17 +6,23 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <zlib.h>
 
 HTTP::Response Handler::root()
 {
     return { .status = HTTP::Status::OK, .body {}, .headers {} };
 }
 
-HTTP::Response Handler::echo(std::string_view body)
+HTTP::Response Handler::echo(std::string_view body, const std::unordered_map<std::string, std::string>& reqHeaders)
 {
-    return { .status = HTTP::Status::OK,
-             .body { body },
-             .headers { { "Content-Type", "text/plain" }, { "Content-Length", std::to_string(body.size()) } } };
+    HTTP::Response resp { .status = HTTP::Status::OK,
+                          .body { body },
+                          .headers { { "Content-Type", "text/plain" },
+                                     { "Content-Length", std::to_string(body.size()) } } };
+
+    if (auto search { reqHeaders.find("accept-encoding") }; search != reqHeaders.end() && search->second == "gzip")
+        resp.headers["Content-Encoding"] = "gzip";
+    return resp;
 }
 
 HTTP::Response Handler::userAgent(const std::unordered_map<std::string, std::string>& reqHeaders)
@@ -47,7 +53,7 @@ HTTP::Response Handler::getFile(const std::filesystem::path& path)
                         { "Content-Length", std::move(contentSize) } } };
 }
 
-HTTP::Response Handler::postFile(const std::filesystem::path& path, std::string_view content)
+HTTP::Response Handler::postFile(std::string_view content, const std::filesystem::path& path)
 {
     std::ofstream file { path, std::ios::binary };
     if (!file)
