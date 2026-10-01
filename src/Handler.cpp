@@ -1,7 +1,11 @@
 #include "Handler.h"
 #include "HTTP.h"
+#include "Settings.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -20,8 +24,28 @@ HTTP::Response Handler::echo(std::string_view body, const std::unordered_map<std
                           .headers { { "Content-Type", "text/plain" },
                                      { "Content-Length", std::to_string(body.size()) } } };
 
-    if (auto search { reqHeaders.find("accept-encoding") }; search != reqHeaders.end() && search->second == "gzip")
-        resp.headers["Content-Encoding"] = "gzip";
+    auto findValidCompressionScheme { [&]() -> std::optional<std::string_view> {
+        auto search { reqHeaders.find("accept-encoding") };
+        if (search == reqHeaders.end())
+            return {};
+        using namespace std::string_view_literals;
+        for (const auto& word : std::ranges::views::split(search->second, ","sv))
+        {
+            std::string_view scheme { word };
+            if (auto first { scheme.find_first_not_of(' ') }; first != std::string_view::npos)
+                scheme.remove_prefix(first);
+            if (auto last { scheme.find_last_not_of(' ') }; last != std::string_view::npos)
+                scheme.remove_suffix(scheme.size() - last - 1);
+            if (auto result { std::ranges::find(Settings::validSchemes, scheme) };
+                result != Settings::validSchemes.end())
+                return *result;
+        }
+        return {};
+    } };
+
+    if (auto encoding { findValidCompressionScheme() })
+        resp.headers["Content-Encoding"] = *encoding;
+
     return resp;
 }
 
