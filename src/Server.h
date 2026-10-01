@@ -6,7 +6,6 @@
 #include "ThreadPool.h"
 #include <cstddef>
 #include <string>
-#include <thread>
 
 class Server
 {

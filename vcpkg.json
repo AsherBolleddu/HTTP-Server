@@ -1,6 +1,3 @@
 {
-    "dependencies": [
-        "pthreads",
-        "zlib"
-    ]
+  "dependencies": ["zlib"]
 }

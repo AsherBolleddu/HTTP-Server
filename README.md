@@ -17,14 +17,14 @@ A multithreaded HTTP/1.1 server written from scratch on POSIX sockets, with no n
 ### Requirements
 
 - Linux or macOS
-- CMake 3.13 or newer
+- CMake 3.17 or newer and Ninja
 - - A compiler with C++23 library support (tested with Apple clang 21 on macOS arm64; the code uses `std::out_ptr` and `std::string_view::contains`)
 - [vcpkg](https://github.com/microsoft/vcpkg), with `VCPKG_ROOT` set (it supplies zlib)
 
 ### Build and run
 
 ```sh
-./your_program.sh --directory /tmp/files
+./run.sh --directory /tmp/files
 ```
 
 The script configures CMake, builds, and starts the server on port `4221`. To do the steps by hand:
