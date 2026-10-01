@@ -12,8 +12,10 @@ namespace HTTP
     enum class Status
     {
         OK = 200,
+        CREATED = 201,
         BAD_REQUEST = 400,
         NOT_FOUND = 404,
+        CONTENT_TOO_LARGE = 413,
     };
 
     constexpr std::string_view getStatus(Status status)
@@ -22,10 +24,12 @@ namespace HTTP
 
         switch (status)
         {
-        case OK:          return "200 OK";
-        case BAD_REQUEST: return "400 Bad Request";
-        case NOT_FOUND:   return "404 Not Found";
-        default:          return "500 Internal Server Error";
+        case OK:                return "200 OK";
+        case CREATED:           return "201 Created";
+        case BAD_REQUEST:       return "400 Bad Request";
+        case NOT_FOUND:         return "404 Not Found";
+        case CONTENT_TOO_LARGE: return "413 Content Too Large";
+        default:                return "500 Internal Server Error";
         }
     }
     struct RequestLine
@@ -39,18 +43,18 @@ namespace HTTP
     {
         RequestLine requestLine;
         std::unordered_map<std::string, std::string> headers;
+        std::string body;
 
         friend std::ostream& operator<<(std::ostream& out, const Request& req)
         {
-            const auto& [requestLine, headers] { req };
+            const auto& [requestLine, headers, body] { req };
             const auto& [method, target, version] { requestLine };
             out << "Method: " << method << '\n';
             out << "Target: " << target << '\n';
             out << "Version: " << version << '\n';
-            out << "Headers:\n";
             for (const auto& [key, value] : headers)
-                out << key << ": " << value << '\n';
-
+                out << "Header[" << key << ": " << value << "]\n";
+            out << "Body: " << body << '\n';
             return out;
         }
     };

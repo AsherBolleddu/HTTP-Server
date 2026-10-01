@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 class Socket
@@ -15,6 +16,7 @@ public:
     int fd() const { return m_fd; }
 
     std::string recvAll() const;
+    std::string recvExact(std::size_t contentLength) const;
     bool sendAll(std::string_view bytes) const;
 
     static constexpr int getInvalidFD() { return invalidFD; }

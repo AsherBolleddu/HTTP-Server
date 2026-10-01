@@ -1,15 +1,20 @@
 #include "Server.h"
 #include "FailedError.h"
 #include "HTTP.h"
+#include "Settings.h"
 #include "Socket.h"
 #include <cerrno>
+#include <charconv>
 #include <format>
 #include <iostream>
 #include <memory>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdexcept>
+#include <string_view>
 #include <sys/socket.h>
+#include <system_error>
+#include <utility>
 
 Socket Server::makeListener(const std::string& port, int connectionBacklog)
 {
@@ -65,19 +70,54 @@ void Server::serve()
     }
 }
 
+void Server::sendResponse(const Socket& client, const HTTP::Response& resp) const
+{
+    if (!client.sendAll(HTTP::serialize(resp)))
+        std::cerr << FailedError::formattedError("send", errno) << '\n';
+}
+
 void Server::handleClient(const Socket& client) const
 {
+    const HTTP::Response badRequest { .status = HTTP::Status::BAD_REQUEST, .body {}, .headers {} };
+
     auto httpReq { client.recvAll() };
-    auto req { HTTP::parseRequest(httpReq) };
-    if (!req)
-        return;
-
-    auto resp { HTTP::route(*req, m_config.directory) };
-    auto httpResp { HTTP::serialize(resp) };
-
-    if (!client.sendAll(httpResp))
+    if (httpReq.empty())
     {
-        std::cerr << FailedError::formattedError("send", errno) << '\n';
+        sendResponse(client, badRequest);
         return;
     }
+
+    auto req { HTTP::parseRequest(httpReq) };
+    if (!req)
+    {
+        sendResponse(client, badRequest);
+        return;
+    }
+
+    std::size_t contentLength {};
+    if (auto found { req->headers.find("content-length") }; found != req->headers.end())
+    {
+        std::string_view value { found->second };
+        auto [ptr, ec] { std::from_chars(value.data(), value.data() + value.size(), contentLength) };
+        if (ec != std::errc {} || ptr != value.data() + value.size())
+            return;
+    }
+
+    if (contentLength > Settings::maxBodySize)
+    {
+        sendResponse(client, { .status = HTTP::Status::CONTENT_TOO_LARGE, .body {}, .headers {} });
+        return;
+    }
+
+    if (req->body.size() < contentLength)
+    {
+        std::size_t missing { contentLength - req->body.size() };
+        std::string rest { client.recvExact(missing) };
+        if (rest.size() != missing)
+            return;
+        req->body += rest;
+    }
+
+    auto resp { HTTP::route(*req, m_config.directory) };
+    sendResponse(client, resp);
 }

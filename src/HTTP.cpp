@@ -66,7 +66,9 @@ std::optional<HTTP::Request> HTTP::parseRequest(std::string_view URL)
     if (!requestLine || !headers)
         return {};
 
-    return HTTP::Request { .requestLine { std::move(*requestLine) }, .headers { std::move(*headers) } };
+    return HTTP::Request { .requestLine { std::move(*requestLine) },
+                           .headers { std::move(*headers) },
+                           .body { URL.substr(headerEnd + 4) } };
 }
 
 std::string HTTP::serialize(const Response& response)
@@ -113,8 +115,9 @@ HTTP::Response HTTP::route(const Request& request, std::string_view directory)
         std::string_view fileSV { route.substr(7) };
         if (!fileSV.starts_with("/") && !fileSV.contains(".."))
         {
+            std::string_view method { request.requestLine.method };
             std::filesystem::path path { std::filesystem::path { directory } / fileSV };
-            if (std::filesystem::is_regular_file(path))
+            if (method == "GET" && std::filesystem::is_regular_file(path))
             {
                 std::ifstream file { path, std::ios::binary };
                 std::stringstream buffer;
@@ -125,6 +128,16 @@ HTTP::Response HTTP::route(const Request& request, std::string_view directory)
                          .body { std::move(content) },
                          .headers { { "Content-Type", "application/octet-stream" },
                                     { "Content-Length", std::move(contentSize) } } };
+            }
+
+            if (method == "POST")
+            {
+                std::ofstream file { path, std::ios::binary };
+                if (file)
+                {
+                    file << request.body;
+                    return { .status = Status::CREATED, .body {}, .headers {} };
+                }
             }
         }
     }

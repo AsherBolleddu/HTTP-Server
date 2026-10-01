@@ -1,4 +1,6 @@
 #include "Socket.h"
+#include <algorithm>
+#include <cstddef>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -20,6 +22,21 @@ std::string Socket::recvAll() const
     }
 
     return buffer;
+}
+
+std::string Socket::recvExact(std::size_t contentLength) const
+{
+    std::string body {};
+    std::string chunk(1024, '\0');
+    while (body.size() < contentLength)
+    {
+        auto bytesRecieved { recv(m_fd, chunk.data(), std::min(chunk.size(), contentLength - body.size()), 0) };
+        if (bytesRecieved <= 0)
+            break;
+        body.append(chunk.data(), static_cast<std::size_t>(bytesRecieved));
+    }
+
+    return body;
 }
 
 bool Socket::sendAll(std::string_view bytes) const
