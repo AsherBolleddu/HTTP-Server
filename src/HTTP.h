@@ -12,6 +12,7 @@ namespace HTTP
     enum class Status
     {
         OK = 200,
+        BAD_REQUEST = 400,
         NOT_FOUND = 404,
     };
 
@@ -21,9 +22,10 @@ namespace HTTP
 
         switch (status)
         {
-        case OK:        return "200 OK";
-        case NOT_FOUND: return "404 Not Found";
-        default:        return "500 Internal Server Error";
+        case OK:          return "200 OK";
+        case BAD_REQUEST: return "400 Bad Request";
+        case NOT_FOUND:   return "404 Not Found";
+        default:          return "500 Internal Server Error";
         }
     }
     struct RequestLine

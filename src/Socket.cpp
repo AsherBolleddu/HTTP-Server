@@ -2,6 +2,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <utility>
 
 Socket::Socket(int fd) : m_fd { fd } {}
 
@@ -35,7 +36,22 @@ bool Socket::sendAll(std::string_view bytes) const
     return true;
 }
 
+Socket::Socket(Socket&& other) noexcept : m_fd { std::exchange(other.m_fd, invalidFD) } {}
+
+Socket& Socket::operator=(Socket&& other) noexcept
+{
+    if (this == &other)
+        return *this;
+
+    if (m_fd != invalidFD)
+        close(m_fd);
+
+    m_fd = std::exchange(other.m_fd, invalidFD);
+    return *this;
+}
+
 Socket::~Socket()
 {
-    close(m_fd);
+    if (m_fd != invalidFD)
+        close(m_fd);
 }
