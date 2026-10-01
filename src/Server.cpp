@@ -79,45 +79,51 @@ void Server::sendResponse(const Socket& client, const HTTP::Response& resp) cons
 void Server::handleClient(const Socket& client) const
 {
     const HTTP::Response badRequest { .status = HTTP::Status::BAD_REQUEST, .body {}, .headers {} };
-
-    auto httpReq { client.recvAll() };
-    if (httpReq.empty())
-        return;
-
-    auto req { HTTP::parseRequest(httpReq) };
-    if (!req)
+    bool keepAlive { true };
+    while (keepAlive)
     {
-        sendResponse(client, badRequest);
-        return;
-    }
+        auto httpReq { client.recvAll() };
+        if (httpReq.empty())
+            continue;
 
-    std::size_t contentLength {};
-    if (auto found { req->headers.find("content-length") }; found != req->headers.end())
-    {
-        std::string_view value { found->second };
-        auto [ptr, ec] { std::from_chars(value.data(), value.data() + value.size(), contentLength) };
-        if (ec != std::errc {} || ptr != value.data() + value.size())
+        auto req { HTTP::parseRequest(httpReq) };
+        if (!req)
         {
             sendResponse(client, badRequest);
-            return;
+            continue;
         }
-    }
 
-    if (contentLength > Settings::maxBodySize)
-    {
-        sendResponse(client, { .status = HTTP::Status::CONTENT_TOO_LARGE, .body {}, .headers {} });
-        return;
-    }
+        std::size_t contentLength {};
+        if (auto found { req->headers.find("content-length") }; found != req->headers.end())
+        {
+            std::string_view value { found->second };
+            auto [ptr, ec] { std::from_chars(value.data(), value.data() + value.size(), contentLength) };
+            if (ec != std::errc {} || ptr != value.data() + value.size())
+            {
+                sendResponse(client, badRequest);
+                continue;
+            }
+        }
 
-    if (req->body.size() < contentLength)
-    {
-        std::size_t missing { contentLength - req->body.size() };
-        std::string rest { client.recvExact(missing) };
-        if (rest.size() != missing)
-            return;
-        req->body += rest;
-    }
+        if (contentLength > Settings::maxBodySize)
+        {
+            sendResponse(client, { .status = HTTP::Status::CONTENT_TOO_LARGE, .body {}, .headers {} });
+            continue;
+        }
 
-    auto resp { HTTP::route(*req, m_config.directory) };
-    sendResponse(client, resp);
+        if (req->body.size() < contentLength)
+        {
+            std::size_t missing { contentLength - req->body.size() };
+            std::string rest { client.recvExact(missing) };
+            if (rest.size() != missing)
+                continue;
+            req->body += rest;
+        }
+
+        auto resp { HTTP::route(*req, m_config.directory) };
+        sendResponse(client, resp);
+
+        if (auto search { req->headers.find("connection") }; search != req->headers.end() && search->second == "close")
+            keepAlive = false;
+    }
 }
