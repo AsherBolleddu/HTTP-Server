@@ -78,6 +78,6 @@ namespace HTTP
     std::optional<Request> parseRequest(std::string_view URL);
 
     std::string serialize(const Response& response);
-    Response route(const Request& request);
+    Response route(const Request& request, std::string_view directory);
 
 } // namespace HTTP

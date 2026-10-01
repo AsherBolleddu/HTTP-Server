@@ -42,8 +42,9 @@ Socket Server::makeListener(const std::string& port, int connectionBacklog)
     return listener;
 }
 
-Server::Server(const std::string& port, int connectionBacklog, std::size_t numThreads)
-    : m_listener { makeListener(port, connectionBacklog) }, m_pool { &handleClient, numThreads }
+Server::Server(const std::string& port, int connectionBacklog, Config config, std::size_t numThreads)
+    : m_listener { makeListener(port, connectionBacklog) }, m_config { std::move(config) },
+      m_pool { [this](const Socket& client) { handleClient(client); }, numThreads }
 {
 }
 
@@ -64,14 +65,14 @@ void Server::serve()
     }
 }
 
-void Server::handleClient(const Socket& client)
+void Server::handleClient(const Socket& client) const
 {
     auto httpReq { client.recvAll() };
     auto req { HTTP::parseRequest(httpReq) };
     if (!req)
         return;
 
-    auto resp { HTTP::route(*req) };
+    auto resp { HTTP::route(*req, m_config.directory) };
     auto httpResp { HTTP::serialize(resp) };
 
     if (!client.sendAll(httpResp))

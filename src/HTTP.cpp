@@ -1,7 +1,10 @@
 #include "HTTP.h"
 #include "Helper.h"
+#include <filesystem>
+#include <fstream>
 #include <optional>
 #include <ranges>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -79,7 +82,7 @@ std::string HTTP::serialize(const Response& response)
     return resp;
 }
 
-HTTP::Response HTTP::route(const Request& request)
+HTTP::Response HTTP::route(const Request& request, std::string_view directory)
 {
     std::string_view route { request.requestLine.target };
     if (route == "/")
@@ -102,6 +105,27 @@ HTTP::Response HTTP::route(const Request& request)
                      .body { search->second },
                      .headers { { "Content-Type", "text/plain" },
                                 { "Content-Length", std::to_string(search->second.size()) } } };
+        }
+    }
+
+    if (route.starts_with("/files/"))
+    {
+        std::string_view fileSV { route.substr(7) };
+        if (!fileSV.starts_with("/") && !fileSV.contains(".."))
+        {
+            std::filesystem::path path { std::filesystem::path { directory } / fileSV };
+            if (std::filesystem::is_regular_file(path))
+            {
+                std::ifstream file { path, std::ios::binary };
+                std::stringstream buffer;
+                buffer << file.rdbuf();
+                std::string content { buffer.str() };
+                auto contentSize { std::to_string(content.size()) };
+                return { .status = Status::OK,
+                         .body { std::move(content) },
+                         .headers { { "Content-Type", "application/octet-stream" },
+                                    { "Content-Length", std::move(contentSize) } } };
+            }
         }
     }
 

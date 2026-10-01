@@ -19,8 +19,7 @@ private:
     std::function<void(const Socket&)> m_handler;
 
 public:
-    ThreadPool(std::function<void(const Socket&)> m_handler,
-               std::size_t numThreads = std::thread::hardware_concurrency());
+    ThreadPool(std::function<void(const Socket&)> m_handler, std::size_t numThreads);
     void enqueue(Socket client);
     ~ThreadPool();
 };

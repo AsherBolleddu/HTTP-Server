@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "Socket.h"
 #include "ThreadPool.h"
 #include <cstddef>
@@ -10,14 +11,15 @@ class Server
 {
 private:
     Socket m_listener;
+    Config m_config;
     ThreadPool m_pool;
 
     static Socket makeListener(const std::string& port, int connectionBacklog);
 
 public:
-    Server(const std::string& port, int connectionBacklog, std::size_t numThreads);
+    Server(const std::string& port, int connectionBacklog, Config config, std::size_t numThreads);
 
-    static void handleClient(const Socket& client);
+    void handleClient(const Socket& client) const;
 
     void serve();
 };
