@@ -82,10 +82,7 @@ void Server::handleClient(const Socket& client) const
 
     auto httpReq { client.recvAll() };
     if (httpReq.empty())
-    {
-        sendResponse(client, badRequest);
         return;
-    }
 
     auto req { HTTP::parseRequest(httpReq) };
     if (!req)
@@ -100,7 +97,10 @@ void Server::handleClient(const Socket& client) const
         std::string_view value { found->second };
         auto [ptr, ec] { std::from_chars(value.data(), value.data() + value.size(), contentLength) };
         if (ec != std::errc {} || ptr != value.data() + value.size())
+        {
+            sendResponse(client, badRequest);
             return;
+        }
     }
 
     if (contentLength > Settings::maxBodySize)

@@ -1,10 +1,9 @@
 #include "HTTP.h"
-#include "Helper.h"
+#include "Handler.h"
+#include <cctype>
 #include <filesystem>
-#include <fstream>
 #include <optional>
 #include <ranges>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -29,6 +28,15 @@ std::optional<std::unordered_map<std::string, std::string>> HTTP::parseHeaders(s
 {
     using namespace std::string_view_literals;
     std::unordered_map<std::string, std::string> headers;
+
+    auto toLower { [](std::string_view sv) {
+        std::string out { sv };
+        for (char& c : out)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+        return out;
+    } };
+
     for (const auto& line : std::ranges::views::split(headerLine, "\r\n"sv))
     {
         std::string_view sv { line };
@@ -36,7 +44,7 @@ std::optional<std::unordered_map<std::string, std::string>> HTTP::parseHeaders(s
         if (colon == std::string_view::npos)
             return {};
 
-        std::string key { Helper::toLower(sv.substr(0, colon)) };
+        std::string key { toLower(sv.substr(0, colon)) };
         std::string_view value { sv.substr(colon + 1) };
         auto firstNonSpace { value.find_first_not_of(' ') };
         if (firstNonSpace != std::string_view::npos)
@@ -44,14 +52,12 @@ std::optional<std::unordered_map<std::string, std::string>> HTTP::parseHeaders(s
         else
             value = {};
 
-        // std::cout << key << ": " << value << '\n';
         headers[std::move(key)] = std::string { value };
     }
 
     return headers;
 }
 
-// GET /index.html HTTP/1.1\r\nHost: localhost:4221\r\nUser-Agent: curl/7.64.1\r\nAccept: */*\r\n\r\n
 std::optional<HTTP::Request> HTTP::parseRequest(std::string_view URL)
 {
 
@@ -84,63 +90,37 @@ std::string HTTP::serialize(const Response& response)
     return resp;
 }
 
+HTTP::Response HTTP::emptyResponse(Status status)
+{
+    return { .status = status, .body {}, .headers {} };
+}
+
 HTTP::Response HTTP::route(const Request& request, std::string_view directory)
 {
     std::string_view route { request.requestLine.target };
     if (route == "/")
-        return { .status = Status::OK, .body {}, .headers {} };
+        return Handler::root();
 
     if (route.starts_with("/echo/"))
-    {
-        std::string_view body { route.substr(6) };
-        return { .status = Status::OK,
-                 .body { body },
-                 .headers { { "Content-Type", "text/plain" }, { "Content-Length", std::to_string(body.size()) } } };
-    }
+        return Handler::echo(route.substr(6));
 
     if (route.starts_with("/user-agent"))
-    {
-        const auto& headers { request.headers };
-        if (auto search { headers.find("user-agent") }; search != headers.end())
-        {
-            return { .status = Status::OK,
-                     .body { search->second },
-                     .headers { { "Content-Type", "text/plain" },
-                                { "Content-Length", std::to_string(search->second.size()) } } };
-        }
-    }
+        return Handler::userAgent(request.headers);
 
     if (route.starts_with("/files/"))
     {
-        std::string_view fileSV { route.substr(7) };
-        if (!fileSV.starts_with("/") && !fileSV.contains(".."))
+        std::string_view fileName { route.substr(7) };
+        if (!fileName.starts_with("/") && !fileName.contains(".."))
         {
             std::string_view method { request.requestLine.method };
-            std::filesystem::path path { std::filesystem::path { directory } / fileSV };
-            if (method == "GET" && std::filesystem::is_regular_file(path))
-            {
-                std::ifstream file { path, std::ios::binary };
-                std::stringstream buffer;
-                buffer << file.rdbuf();
-                std::string content { buffer.str() };
-                auto contentSize { std::to_string(content.size()) };
-                return { .status = Status::OK,
-                         .body { std::move(content) },
-                         .headers { { "Content-Type", "application/octet-stream" },
-                                    { "Content-Length", std::move(contentSize) } } };
-            }
+            std::filesystem::path path { std::filesystem::path { directory } / fileName };
+            if (method == "GET")
+                return Handler::getFile(path);
 
             if (method == "POST")
-            {
-                std::ofstream file { path, std::ios::binary };
-                if (file)
-                {
-                    file << request.body;
-                    return { .status = Status::CREATED, .body {}, .headers {} };
-                }
-            }
+                return Handler::postFile(path, request.body);
         }
     }
 
-    return { .status = Status::NOT_FOUND, .body {}, .headers {} };
+    return emptyResponse(HTTP::Status::NOT_FOUND);
 }
