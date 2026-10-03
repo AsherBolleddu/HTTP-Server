@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <system_error>
 #include <utility>
 
@@ -55,14 +56,21 @@ Server::Server(const std::string& port, int connectionBacklog, Config config, st
 
 void Server::serve()
 {
-    sockaddr_storage clientInfo {};
-    socklen_t clientSize { sizeof(clientInfo) };
     while (true)
     {
+        sockaddr_storage clientInfo {};
+        socklen_t clientSize { sizeof(clientInfo) };
         Socket client { accept(m_listener.fd(), reinterpret_cast<sockaddr*>(&clientInfo), &clientSize) };
         if (client.fd() == -1)
         {
             std::cerr << FailedError::formattedError("accept", errno) << '\n';
+            continue;
+        }
+
+        timeval timeout { .tv_sec = 5, .tv_usec = 0 };
+        if (setsockopt(client.fd(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1)
+        {
+            std::cerr << FailedError::formattedError("setsockopt", errno) << '\n';
             continue;
         }
 
@@ -78,6 +86,7 @@ void Server::sendResponse(const Socket& client, const HTTP::Response& resp) cons
 
 void Server::handleClient(const Socket& client) const
 {
+
     const HTTP::Response badRequest { .status = HTTP::Status::BAD_REQUEST, .body {}, .headers {} };
     bool keepAlive { true };
     while (keepAlive)
