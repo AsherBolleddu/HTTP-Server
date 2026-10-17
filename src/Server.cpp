@@ -77,7 +77,7 @@ void Server::serve() const
     auto req { HTTP::parseRequest(httpReq) };
     if (!req)
     {
-        sendResponse(client, { .status = HTTP::Status::BAD_REQUEST });
+        sendResponse(client, { .status = req.error() });
         return;
     }
 
@@ -89,30 +89,4 @@ void Server::serve() const
     }
 
     sendResponse(client, *resp);
-
-    // Router::execute(std::string_view targetSV, std::string_view methodSV, std::string_view data)
-    // if (req->request.target.starts_with("/echo"))
-    // {
-    //     auto find { req->request.target.find('/', 1) };
-    //     if (find == std::string_view::npos)
-    //         return;
-    //     auto data { req->request.target.substr(find + 1) };
-    //     Router::execute(req->request.target.substr(0, find), req->request.method, data);
-    // }
-    // Refactor: Make function that takes in a request, and builds the response.
-
-    // HTTP::Response resp {};
-    // if (req->request.method == "GET")
-    // {
-    //     if (req->request.target == "/")
-    //         resp.status = HTTP::Status::OK;
-    //     else
-    //         resp.status = HTTP::Status::NOT_FOUND;
-    // }
-
-    // if (!client.sendAll(HTTP::serialize(resp)))
-    // {
-    //     std::cerr << formattedError("send", errno) << '\n';
-    //     return;
-    // };
 }

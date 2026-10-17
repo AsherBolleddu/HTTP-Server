@@ -1,6 +1,6 @@
 #pragma once
 
-#include <optional>
+#include <expected>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -39,17 +39,19 @@ namespace HTTP
     struct Request
     {
         RequestLine reqline;
+        std::unordered_map<std::string, std::string_view> headers;
     };
 
     struct Response
     {
         Status status;
+        std::unordered_map<std::string_view, std::string> headers;
         std::string_view body;
-        std::unordered_map<std::string, std::string> headers;
     };
 
-    std::optional<RequestLine> parseRequestLine(std::string_view requestLine);
-    std::optional<Request> parseRequest(std::string_view request);
+    std::expected<RequestLine, Status> parseRequestLine(std::string_view requestLine);
+    std::expected<std::unordered_map<std::string, std::string_view>, Status> parseHeaders(std::string_view headersSV);
+    std::expected<Request, Status> parseRequest(std::string_view request);
 
     std::string serialize(const Response& response);
 
