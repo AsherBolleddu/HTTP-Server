@@ -1,4 +1,6 @@
 #include "HTTP.hpp"
+#include <format>
+#include <iterator>
 #include <optional>
 #include <string_view>
 
@@ -31,15 +33,18 @@ namespace HTTP
         if (!requestLine)
             return std::nullopt;
 
-        return Request { .request { *requestLine } };
+        return Request { .reqline { *requestLine } };
     }
 
     std::string serialize(const Response& response)
     {
         std::string output { "HTTP/1.1 " };
         output += getStatus(response.status);
-        output += "\r\n\r\n";
+        for (const auto& [key, value] : response.headers)
+            std::format_to(std::back_inserter(output), "\r\n{}: {}", key, value);
 
+        output += "\r\n\r\n";
+        output += response.body;
         return output;
     }
 
