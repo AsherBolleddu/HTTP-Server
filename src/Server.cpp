@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "HTTP.hpp"
 #include <cerrno>
 #include <cstring>
 #include <format>
@@ -64,5 +65,28 @@ void Server::serve() const
 
     std::cout << "Client connected\n";
 
-    client.sendAll();
+    std::string httpReq { client.recvAll() };
+
+    auto req { HTTP::parseRequest(httpReq) };
+    if (!req)
+        return;
+
+    // Refactor: Make function that takes in a request, and builds the response.
+
+    HTTP::Response resp {};
+    if (req->request.method == "GET")
+    {
+        if (req->request.target == "/")
+            resp.status = HTTP::Status::OK;
+        else
+            resp.status = HTTP::Status::NOT_FOUND;
+    }
+
+    std::string httpResp { HTTP::serialize(resp) };
+
+    if (!client.sendAll(httpResp))
+    {
+        std::cerr << formattedError("send", errno) << '\n';
+        return;
+    };
 }

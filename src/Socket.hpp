@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
+#include <string_view>
 class Socket
 {
 private:
@@ -11,7 +13,8 @@ public:
     explicit Socket(int fd);
 
     int fd() const { return m_fd; }
-    std::ptrdiff_t sendAll() const;
+    std::string recvAll() const;
+    bool sendAll(std::string_view bytes) const;
 
     Socket(const Socket&) = delete;
     Socket& operator=(const Socket&) = delete;

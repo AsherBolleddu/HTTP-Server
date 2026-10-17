@@ -1,26 +1,42 @@
 #include "Socket.hpp"
+#include <array>
 #include <cstddef>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <utility>
 
 Socket::Socket(int fd) : m_fd { fd } {}
 
-std::ptrdiff_t Socket::sendAll() const
+std::string Socket::recvAll() const
 {
-    std::string response { "HTTP/1.1 200 OK\r\n\r\n" };
-    std::ptrdiff_t bytesSent { 0 };
-    while (bytesSent < std::ssize(response))
+    std::string buffer {};
+    std::array<char, 1024> chunk {};
+    while (buffer.find("\r\n\r\n") == std::string::npos)
     {
-        auto n { send(m_fd, response.data() + bytesSent, response.size() - static_cast<std::size_t>(bytesSent), 0) };
+        auto n { recv(m_fd, chunk.data(), chunk.size(), 0) };
+        if (n <= 0)
+            break;
+        buffer.append(chunk.data(), static_cast<std::size_t>(n));
+    }
+
+    return buffer;
+}
+
+bool Socket::sendAll(std::string_view bytes) const
+{
+    std::ptrdiff_t bytesSent { 0 };
+    while (bytesSent < std::ssize(bytes))
+    {
+        auto n { send(m_fd, bytes.data() + bytesSent, static_cast<std::size_t>(std::ssize(bytes) - bytesSent), 0) };
         if (n <= 0)
             break;
         bytesSent += n;
     }
 
-    return bytesSent;
+    return bytesSent == std::ssize(bytes);
 }
 
 Socket::Socket(Socket&& other) noexcept : m_fd { std::exchange(other.m_fd, invalidFD) } {}
