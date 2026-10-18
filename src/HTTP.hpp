@@ -13,6 +13,7 @@ namespace HTTP
         BAD_REQUEST = 400,
         NOT_FOUND = 404,
         METHOD_NOT_ALLOWED = 405,
+        INTERNAL_SERVER_ERROR = 500,
     };
 
     constexpr std::string_view getStatus(HTTP::Status status)
@@ -46,7 +47,7 @@ namespace HTTP
     {
         Status status;
         std::unordered_map<std::string_view, std::string> headers;
-        std::string_view body;
+        std::string body;
     };
 
     std::expected<RequestLine, Status> parseRequestLine(std::string_view requestLine);

@@ -3,6 +3,7 @@
 #include "Socket.hpp"
 #include <condition_variable>
 #include <cstddef>
+#include <functional>
 #include <mutex>
 #include <queue>
 #include <thread>
@@ -15,11 +16,11 @@ private:
     std::mutex m_queueMutex;
     std::condition_variable m_queueCV;
     bool m_stop { false };
-    void (*m_handler)(const Socket&);
+    std::function<void(const Socket&)> m_handler;
     std::vector<std::thread> m_workers;
 
 public:
-    ThreadPool(std::size_t nthreads, void (*handler)(const Socket&));
+    ThreadPool(std::size_t nthreads, std::function<void(const Socket&)>);
 
     void enqueue(Socket);
 

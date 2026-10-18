@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Config.hpp"
 #include "HTTP.hpp"
 #include "Router.hpp"
 #include "Settings.hpp"
@@ -26,6 +27,27 @@ namespace
     {
         if (!client.sendAll(HTTP::serialize(resp)))
             std::cerr << formattedError("send", errno) << '\n';
+    }
+
+    void handleClient(const Socket& client, const Config& cfg)
+    {
+        std::string httpReq { client.recvAll() };
+
+        auto req { HTTP::parseRequest(httpReq) };
+        if (!req)
+        {
+            sendResponse(client, { .status = req.error() });
+            return;
+        }
+
+        auto resp { Router::execute(*req, cfg) };
+        if (!resp)
+        {
+            sendResponse(client, { .status = resp.error() });
+            return;
+        }
+
+        sendResponse(client, *resp);
     }
 } // namespace
 
@@ -66,28 +88,11 @@ Socket Server::makeListener()
     return listener;
 }
 
-void Server::handleClient(const Socket& client)
+Server::Server(Config cfg)
+    : m_cfg { std::move(cfg) }, m_listener { makeListener() },
+      m_pool { Settings::nthreads, [&cfg = m_cfg](const Socket& client) { handleClient(client, cfg); } }
 {
-    std::string httpReq { client.recvAll() };
-
-    auto req { HTTP::parseRequest(httpReq) };
-    if (!req)
-    {
-        sendResponse(client, { .status = req.error() });
-        return;
-    }
-
-    auto resp { Router::execute(*req) };
-    if (!resp)
-    {
-        sendResponse(client, { .status = resp.error() });
-        return;
-    }
-
-    sendResponse(client, *resp);
 }
-
-Server::Server() : m_listener { makeListener() }, m_pool { Settings::nthreads, handleClient } {}
 
 void Server::serve()
 {

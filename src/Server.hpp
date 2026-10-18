@@ -1,19 +1,20 @@
 #pragma once
 
+#include "Config.hpp"
 #include "Socket.hpp"
 #include "ThreadPool.hpp"
 
 class Server
 {
 private:
+    Config m_cfg;
     Socket m_listener;
     ThreadPool m_pool;
 
     static Socket makeListener();
-    static void handleClient(const Socket& client);
 
 public:
-    Server();
+    Server(Config cfg);
 
     void serve();
 };
