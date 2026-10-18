@@ -14,6 +14,7 @@ namespace HTTP
         BAD_REQUEST = 400,
         NOT_FOUND = 404,
         METHOD_NOT_ALLOWED = 405,
+        CONTENT_TOO_LARGE = 413,
         INTERNAL_SERVER_ERROR = 500,
     };
 
@@ -28,6 +29,7 @@ namespace HTTP
         case BAD_REQUEST:        return "400 Bad Request";
         case NOT_FOUND:          return "404 Not Found";
         case METHOD_NOT_ALLOWED: return "405 Method Not Allowed";
+        case CONTENT_TOO_LARGE:  return "413 Content Too Large";
         default:                 return "500 Internal Server Error";
         }
     }

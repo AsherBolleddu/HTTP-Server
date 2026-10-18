@@ -124,6 +124,9 @@ namespace Router
             if (!data.info)
                 return std::unexpected { HTTP::Status::NOT_FOUND };
 
+            if (data.info.value().starts_with('/') || data.info.value().contains(".."))
+                return std::unexpected { HTTP::Status::NOT_FOUND };
+
             namespace fs = std::filesystem;
             fs::path path { fs::path { data.cfg.directory } / data.info.value() };
             if (!fs::is_regular_file(path))
@@ -131,7 +134,7 @@ namespace Router
 
             std::ifstream file { path, std::ios::binary };
             if (!file)
-                std::unexpected { HTTP::Status::INTERNAL_SERVER_ERROR };
+                return std::unexpected { HTTP::Status::INTERNAL_SERVER_ERROR };
 
             std::stringstream buffer;
             buffer << file.rdbuf();
@@ -150,10 +153,16 @@ namespace Router
             if (!data.info)
                 return std::unexpected { HTTP::Status::NOT_FOUND };
 
+            if (data.info.value().starts_with('/') || data.info.value().contains(".."))
+                return std::unexpected { HTTP::Status::NOT_FOUND };
+
             namespace fs = std::filesystem;
             fs::path path { fs::path { data.cfg.directory } / data.info.value() };
 
             std::ofstream file { path, std::ios::binary };
+            if (!file)
+                return std::unexpected { HTTP::Status::INTERNAL_SERVER_ERROR };
+
             file << data.body;
 
             return HTTP::Response { .status = HTTP::Status::CREATED };

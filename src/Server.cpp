@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <system_error>
 #include <utility>
 
@@ -37,12 +38,14 @@ namespace
         while (keepAlive)
         {
             std::string httpReq { client.recvAll() };
+            if (httpReq.empty())
+                break;
 
             auto req { HTTP::parseRequest(httpReq) };
             if (!req)
             {
                 sendResponse(client, { .status = req.error() });
-                return;
+                break;
             }
 
             if (auto it { req->headers.find("content-length") }; it != req->headers.end())
@@ -52,17 +55,30 @@ namespace
                 if (ec != std::errc {} || ptr != it->second.data() + it->second.size())
                 {
                     sendResponse(client, { .status = HTTP::Status::BAD_REQUEST });
-                    return;
+                    break;
                 }
 
-                req->body += client.recvExact(len - req->body.size());
+                if (len > Settings::maxBodySize)
+                {
+                    sendResponse(client, { .status = HTTP::Status::CONTENT_TOO_LARGE });
+                    break;
+                }
+
+                if (req->body.size() < len)
+                {
+                    std::size_t missing { len - req->body.size() };
+                    std::string rest { client.recvExact(missing) };
+                    if (rest.size() != missing)
+                        break;
+                    req->body += rest;
+                }
             }
 
             auto resp { Router::execute(*req, cfg) };
             if (!resp)
             {
                 sendResponse(client, { .status = resp.error() });
-                return;
+                break;
             }
 
             if (auto it { req->headers.find("connection") }; it != req->headers.end() && it->second == "close")
@@ -96,10 +112,6 @@ Socket Server::makeListener()
     if (setsockopt(listener.fd(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
         throw std::runtime_error { formattedError("setsockopt", errno) };
 
-    struct timeval timeout { .tv_sec = 5, .tv_usec = 0 };
-    if (setsockopt(listener.fd(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1)
-        throw std::runtime_error { formattedError("setsockopt", errno) };
-
     int dualStack { 0 };
     if (setsockopt(listener.fd(), IPPROTO_IPV6, IPV6_V6ONLY, &dualStack, sizeof(dualStack)) == -1)
         throw std::runtime_error { formattedError("setsockopt", errno) };
@@ -125,7 +137,17 @@ void Server::serve()
     {
         Socket client { accept(m_listener.fd(), nullptr, nullptr) };
         if (client.fd() == -1)
-            std::cerr << formattedError("accept", errno);
+        {
+            std::cerr << formattedError("accept", errno) << '\n';
+            continue;
+        }
+
+        struct timeval timeout { .tv_sec = 5, .tv_usec = 0 };
+        if (setsockopt(client.fd(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1)
+        {
+            std::cerr << formattedError("setsockopt", errno) << '\n';
+            continue;
+        }
 
         m_pool.enqueue(std::move(client));
     }

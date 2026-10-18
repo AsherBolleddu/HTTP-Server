@@ -29,6 +29,9 @@ namespace HTTP
     {
         std::unordered_map<std::string, std::string_view> headers;
 
+        if (headersSV.empty())
+            return headers;
+
         auto toLower { [](std::string_view sv) {
             std::string out { sv };
             std::ranges::transform(out, out.begin(),
@@ -70,11 +73,13 @@ namespace HTTP
         if (!requestLine)
             return std::unexpected { requestLine.error() };
 
-        auto headersEnd { request.find("\r\n\r\n", requestLineEnd + 2) };
+        auto headersEnd { request.find("\r\n\r\n", requestLineEnd) };
         if (headersEnd == std::string_view::npos)
             return std::unexpected { Status::BAD_REQUEST };
 
-        auto headers { parseHeaders(request.substr(requestLineEnd + 2, headersEnd - requestLineEnd - 2)) };
+        auto headers { parseHeaders(headersEnd == requestLineEnd
+                                        ? std::string_view {}
+                                        : request.substr(requestLineEnd + 2, headersEnd - requestLineEnd - 2)) };
         if (!headers)
             return std::unexpected { headers.error() };
 
@@ -89,6 +94,9 @@ namespace HTTP
         output += getStatus(response.status);
         for (const auto& [key, value] : response.headers)
             std::format_to(std::back_inserter(output), "\r\n{}: {}", key, value);
+
+        if (!response.headers.contains("Content-Length"))
+            std::format_to(std::back_inserter(output), "\r\nContent-Length: {}", response.body.size());
 
         output += "\r\n\r\n";
         output += response.body;

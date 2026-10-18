@@ -1,4 +1,5 @@
 #include "Socket.hpp"
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <iterator>
@@ -70,5 +71,6 @@ Socket& Socket::operator=(Socket&& other) noexcept
 
 Socket::~Socket()
 {
-    close(m_fd);
+    if (m_fd != invalidFD)
+        close(m_fd);
 }
