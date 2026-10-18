@@ -33,7 +33,8 @@ namespace
 
     void handleClient(const Socket& client, const Config& cfg)
     {
-        while (true)
+        bool keepAlive { true };
+        while (keepAlive)
         {
             std::string httpReq { client.recvAll() };
 
@@ -62,6 +63,12 @@ namespace
             {
                 sendResponse(client, { .status = resp.error() });
                 return;
+            }
+
+            if (auto it { req->headers.find("connection") }; it != req->headers.end() && it->second == "close")
+            {
+                keepAlive = false;
+                resp->headers.insert({ "Connection", "close" });
             }
 
             sendResponse(client, *resp);
