@@ -43,8 +43,8 @@ Loopback numbers measure the server's per-request overhead, not real network beh
 ### Build and run
 
 ```sh
-./your_program.sh --directory /tmp/files            # Debug build
-./your_program.sh --release --directory /tmp/files  # Release build
+./run.sh --directory /tmp/files            # Debug build
+./run.sh --release --directory /tmp/files  # Release build
 ```
 
 The script configures CMake from `CMakePresets.json`, builds, and starts the server on port `4221`. To do the steps by hand:
