@@ -1,6 +1,7 @@
 #include "Router.hpp"
 #include "Config.hpp"
 #include "HTTP.hpp"
+#include "Settings.hpp"
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -32,12 +33,18 @@ namespace Router
             if (!data.info)
                 return std::unexpected { HTTP::Status::NOT_FOUND };
 
-            return HTTP::Response {
+            HTTP::Response resp {
                 .status = HTTP::Status::OK,
                 .headers { { "Content-Type", "text/plain" },
                            { "Content-Length", std::to_string(data.info.value().length()) } },
                 .body { data.info.value() },
             };
+
+            if (auto it { data.header.find("accept-encoding") }; it != data.header.end())
+                if (Settings::validSchemes.contains(it->second))
+                    resp.headers.insert({ "Content-Encoding", "gzip" });
+
+            return resp;
         }
 
         std::expected<HTTP::Response, HTTP::Status> userAgentHandler(const Data& data)
