@@ -2,13 +2,15 @@
 #include "Config.hpp"
 #include "HTTP.hpp"
 #include "Settings.hpp"
+#include "StringHash.hpp"
+#include <cstddef>
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <optional>
 #include <ranges>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -16,7 +18,8 @@
 
 namespace
 {
-    std::optional<std::string_view> chooseEncoding(const std::unordered_map<std::string, std::string_view>& headers)
+    std::optional<std::string_view> chooseEncoding(
+        const std::unordered_map<std::string, std::string_view, StringHash, std::equal_to<>>& headers)
     {
         using namespace std::string_view_literals;
         auto it(headers.find("accept-encoding"));
@@ -67,7 +70,7 @@ namespace Router
         struct Data
         {
             std::optional<std::string_view> info;
-            const std::unordered_map<std::string, std::string_view>& header;
+            const std::unordered_map<std::string, std::string_view, StringHash, std::equal_to<>>& header;
             std::string_view body;
             const Config& cfg;
         };
@@ -136,13 +139,16 @@ namespace Router
             if (!file)
                 return std::unexpected { HTTP::Status::INTERNAL_SERVER_ERROR };
 
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            std::string content { buffer.str() };
+            auto fileSize { static_cast<std::streamsize>(fs::file_size(path)) };
+            std::string buf(static_cast<std::size_t>(fileSize), '\0');
+            file.read(buf.data(), fileSize);
+            if (file.gcount() != fileSize)
+                return std::unexpected { HTTP::Status::INTERNAL_SERVER_ERROR };
+
             return HTTP::Response { .status = HTTP::Status::OK,
                                     .headers { { "Content-Type", "application/octet-stream" },
-                                               { "Content-Length", std::to_string(content.length()) } },
-                                    .body { std::move(content) } };
+                                               { "Content-Length", std::to_string(buf.length()) } },
+                                    .body { std::move(buf) } };
         }
 
         std::expected<HTTP::Response, HTTP::Status> postFilesHandler(const Data& data)

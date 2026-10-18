@@ -1,6 +1,8 @@
 #pragma once
 
+#include "StringHash.hpp"
 #include <expected>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -44,19 +46,20 @@ namespace HTTP
     struct Request
     {
         RequestLine reqline;
-        std::unordered_map<std::string, std::string_view> headers;
+        std::unordered_map<std::string, std::string_view, StringHash, std::equal_to<>> headers;
         std::string body;
     };
 
     struct Response
     {
         Status status;
-        std::unordered_map<std::string, std::string> headers;
+        std::unordered_map<std::string, std::string, StringHash, std::equal_to<>> headers;
         std::string body;
     };
 
     std::expected<RequestLine, Status> parseRequestLine(std::string_view requestLine);
-    std::expected<std::unordered_map<std::string, std::string_view>, Status> parseHeaders(std::string_view headersSV);
+    std::expected<std::unordered_map<std::string, std::string_view, StringHash, std::equal_to<>>, Status> parseHeaders(
+        std::string_view headersSV);
     std::expected<Request, Status> parseRequest(std::string_view request);
 
     std::string serialize(const Response& response);

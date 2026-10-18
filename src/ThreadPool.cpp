@@ -4,7 +4,8 @@
 #include <mutex>
 #include <utility>
 
-ThreadPool::ThreadPool(std::size_t nthreads, std::function<void(const Socket&)> handler) : m_handler { handler }
+ThreadPool::ThreadPool(std::size_t nthreads, std::function<void(const Socket&)> handler)
+    : m_handler { std::move(handler) }
 {
     for (auto i { 0uz }; i < nthreads; ++i)
     {
