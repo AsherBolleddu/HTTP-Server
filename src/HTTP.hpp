@@ -49,7 +49,7 @@ namespace HTTP
     struct Response
     {
         Status status;
-        std::unordered_map<std::string_view, std::string> headers;
+        std::unordered_map<std::string, std::string> headers;
         std::string body;
     };
 

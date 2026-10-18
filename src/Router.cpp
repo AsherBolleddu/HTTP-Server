@@ -12,8 +12,9 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <zlib.h>
 
-namespace Helper
+namespace
 {
     std::optional<std::string_view> chooseEncoding(const std::unordered_map<std::string, std::string_view>& headers)
     {
@@ -35,7 +36,30 @@ namespace Helper
 
         return std::nullopt;
     }
-} // namespace Helper
+
+    std::optional<std::string> gZipCompress(std::string_view input)
+    {
+        z_stream stream {};
+        if (deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8, Z_DEFAULT_STRATEGY) != Z_OK)
+            return {};
+
+        std::string output(deflateBound(&stream, static_cast<uLong>(input.size())), '\0');
+
+        stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(input.data()));
+        stream.avail_in = static_cast<uInt>(input.size());
+        stream.next_out = reinterpret_cast<Bytef*>(output.data());
+        stream.avail_out = static_cast<uInt>(output.size());
+
+        int result { deflate(&stream, Z_FINISH) };
+        output.resize(static_cast<std::size_t>(stream.total_out));
+        deflateEnd(&stream);
+
+        if (result != Z_STREAM_END)
+            return {};
+
+        return output;
+    }
+} // namespace
 namespace Router
 {
     namespace
@@ -66,11 +90,17 @@ namespace Router
                 .body { data.info.value() },
             };
 
-            auto encoding { Helper::chooseEncoding(data.header) };
+            auto encoding { chooseEncoding(data.header) };
             if (!encoding)
                 return resp;
 
+            auto newData { gZipCompress(data.info.value()) };
+            if (!newData)
+                return resp;
+
             resp.headers.insert({ "Content-Encoding", std::string { *encoding } });
+            resp.body = std::move(*newData);
+            resp.headers["Content-Length"] = std::to_string(resp.body.length());
             return resp;
         }
 
