@@ -15,6 +15,7 @@ public:
 
     int fd() const { return m_fd; }
     std::string recvAll() const;
+    std::string recvExact(std::size_t contentLength) const;
     bool sendAll(std::string_view bytes) const;
 
     Socket(const Socket&) = delete;

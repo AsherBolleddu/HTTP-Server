@@ -78,7 +78,9 @@ namespace HTTP
         if (!headers)
             return std::unexpected { headers.error() };
 
-        return Request { .reqline { *requestLine }, .headers { std::move(*headers) } };
+        return Request { .reqline { *requestLine },
+                         .headers { std::move(*headers) },
+                         .body { request.substr(headersEnd + 4) } };
     }
 
     std::string serialize(const Response& response)

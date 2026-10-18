@@ -23,10 +23,6 @@ int main(int argc, char* argv[])
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
 
-    // You can use print statements as follows for debugging, they'll be visible
-    // when running tests.
-    std::cout << "Logs from your program will appear here!\n";
-
     if ((argc - 1) % 2 != 0)
     {
         std::cout << "Usage: ./your_program.sh --key1 value1 --key2 value2";

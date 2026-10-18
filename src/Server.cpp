@@ -4,6 +4,7 @@
 #include "Router.hpp"
 #include "Settings.hpp"
 #include <cerrno>
+#include <charconv>
 #include <cstring>
 #include <format>
 #include <iostream>
@@ -14,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
+#include <system_error>
 #include <utility>
 
 namespace
@@ -38,6 +40,19 @@ namespace
         {
             sendResponse(client, { .status = req.error() });
             return;
+        }
+
+        if (auto it { req->headers.find("content-length") }; it != req->headers.end())
+        {
+            std::size_t len;
+            const auto [ptr, ec] { std::from_chars(it->second.data(), it->second.data() + it->second.size(), len) };
+            if (ec != std::errc {} || ptr != it->second.data() + it->second.size())
+            {
+                sendResponse(client, { .status = HTTP::Status::BAD_REQUEST });
+                return;
+            }
+
+            req->body += client.recvExact(len - req->body.size());
         }
 
         auto resp { Router::execute(*req, cfg) };

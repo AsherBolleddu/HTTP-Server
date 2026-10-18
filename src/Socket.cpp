@@ -25,6 +25,21 @@ std::string Socket::recvAll() const
     return buffer;
 }
 
+std::string Socket::recvExact(std::size_t bytesRemaining) const
+{
+    std::string buffer {};
+    std::array<char, 1024> chunk {};
+    while (buffer.size() < bytesRemaining)
+    {
+        auto n { recv(m_fd, chunk.data(), std::min(chunk.size(), bytesRemaining - buffer.size()), 0) };
+        if (n <= 0)
+            break;
+        buffer.append(chunk.data(), static_cast<std::size_t>(n));
+    }
+
+    return buffer;
+}
+
 bool Socket::sendAll(std::string_view bytes) const
 {
     std::ptrdiff_t bytesSent { 0 };

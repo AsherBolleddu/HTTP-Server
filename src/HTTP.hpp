@@ -10,6 +10,7 @@ namespace HTTP
     enum class Status
     {
         OK = 200,
+        CREATED = 201,
         BAD_REQUEST = 400,
         NOT_FOUND = 404,
         METHOD_NOT_ALLOWED = 405,
@@ -23,6 +24,7 @@ namespace HTTP
         switch (status)
         {
         case OK:                 return "200 OK";
+        case CREATED:            return "201 Created";
         case BAD_REQUEST:        return "400 Bad Request";
         case NOT_FOUND:          return "404 Not Found";
         case METHOD_NOT_ALLOWED: return "405 Method Not Allowed";
@@ -41,6 +43,7 @@ namespace HTTP
     {
         RequestLine reqline;
         std::unordered_map<std::string, std::string_view> headers;
+        std::string body;
     };
 
     struct Response

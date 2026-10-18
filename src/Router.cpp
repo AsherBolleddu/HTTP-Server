@@ -17,6 +17,7 @@ namespace Router
         {
             std::optional<std::string_view> info;
             const std::unordered_map<std::string, std::string_view>& header;
+            std::string_view body;
             const Config& cfg;
         };
 
@@ -77,12 +78,29 @@ namespace Router
                                     .body { std::move(content) } };
         }
 
+        std::expected<HTTP::Response, HTTP::Status> postFilesHandler(const Data& data)
+        {
+            if (data.cfg.directory.empty())
+                return std::unexpected { HTTP::Status::NOT_FOUND };
+
+            if (!data.info)
+                return std::unexpected { HTTP::Status::NOT_FOUND };
+
+            namespace fs = std::filesystem;
+            fs::path path { fs::path { data.cfg.directory } / data.info.value() };
+
+            std::ofstream file { path, std::ios::binary };
+            file << data.body;
+
+            return HTTP::Response { .status = HTTP::Status::CREATED };
+        }
+
         using Handler = std::expected<HTTP::Response, HTTP::Status> (*)(const Data&);
         const std::unordered_map<std::string_view, std::unordered_map<std::string_view, Handler>> dispatchTable {
             { "/", { { "GET", slashHandler } } },
             { "/echo", { { "GET", echoHandler } } },
             { "/user-agent", { { "GET", userAgentHandler } } },
-            { "/files", { { "GET", getFilesHandler } } }
+            { "/files", { { "GET", getFilesHandler }, { "POST", postFilesHandler } } }
         };
     } // namespace
 
@@ -101,6 +119,7 @@ namespace Router
             { .info { pos == std::string_view::npos ? std::nullopt
                                                     : std::optional { req.reqline.target.substr(pos + 1) } },
               .header { req.headers },
+              .body { req.body },
               .cfg { cfg } });
     }
 
