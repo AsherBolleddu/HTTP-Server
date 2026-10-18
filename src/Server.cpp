@@ -33,36 +33,39 @@ namespace
 
     void handleClient(const Socket& client, const Config& cfg)
     {
-        std::string httpReq { client.recvAll() };
-
-        auto req { HTTP::parseRequest(httpReq) };
-        if (!req)
+        while (true)
         {
-            sendResponse(client, { .status = req.error() });
-            return;
-        }
+            std::string httpReq { client.recvAll() };
 
-        if (auto it { req->headers.find("content-length") }; it != req->headers.end())
-        {
-            std::size_t len;
-            const auto [ptr, ec] { std::from_chars(it->second.data(), it->second.data() + it->second.size(), len) };
-            if (ec != std::errc {} || ptr != it->second.data() + it->second.size())
+            auto req { HTTP::parseRequest(httpReq) };
+            if (!req)
             {
-                sendResponse(client, { .status = HTTP::Status::BAD_REQUEST });
+                sendResponse(client, { .status = req.error() });
                 return;
             }
 
-            req->body += client.recvExact(len - req->body.size());
-        }
+            if (auto it { req->headers.find("content-length") }; it != req->headers.end())
+            {
+                std::size_t len;
+                const auto [ptr, ec] { std::from_chars(it->second.data(), it->second.data() + it->second.size(), len) };
+                if (ec != std::errc {} || ptr != it->second.data() + it->second.size())
+                {
+                    sendResponse(client, { .status = HTTP::Status::BAD_REQUEST });
+                    return;
+                }
 
-        auto resp { Router::execute(*req, cfg) };
-        if (!resp)
-        {
-            sendResponse(client, { .status = resp.error() });
-            return;
-        }
+                req->body += client.recvExact(len - req->body.size());
+            }
 
-        sendResponse(client, *resp);
+            auto resp { Router::execute(*req, cfg) };
+            if (!resp)
+            {
+                sendResponse(client, { .status = resp.error() });
+                return;
+            }
+
+            sendResponse(client, *resp);
+        }
     }
 } // namespace
 
