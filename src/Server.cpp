@@ -1,6 +1,7 @@
 #include "Server.hpp"
 #include "HTTP.hpp"
 #include "Router.hpp"
+#include "Settings.hpp"
 #include <cerrno>
 #include <cstring>
 #include <format>
@@ -12,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <sys/socket.h>
+#include <utility>
 
 namespace
 {
@@ -36,7 +38,7 @@ Socket Server::makeListener()
 
     auto addrInfoDeleter { [](addrinfo* info) { freeaddrinfo(info); } };
     std::unique_ptr<addrinfo, decltype(addrInfoDeleter)> info {};
-    if (int result { getaddrinfo(nullptr, "4221", &hints, std::out_ptr(info)) }; result != 0)
+    if (int result { getaddrinfo(nullptr, Settings::port.c_str(), &hints, std::out_ptr(info)) }; result != 0)
         throw std::runtime_error { std::format("getaddrinfo() failed. ({})", gai_strerror(result)) };
 
     Socket listener { socket(info->ai_family, info->ai_socktype, info->ai_protocol) };
@@ -47,6 +49,10 @@ Socket Server::makeListener()
     if (setsockopt(listener.fd(), SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) == -1)
         throw std::runtime_error { formattedError("setsockopt", errno) };
 
+    struct timeval timeout { .tv_sec = 5, .tv_usec = 0 };
+    if (setsockopt(listener.fd(), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) == -1)
+        throw std::runtime_error { formattedError("setsockopt", errno) };
+
     int dualStack { 0 };
     if (setsockopt(listener.fd(), IPPROTO_IPV6, IPV6_V6ONLY, &dualStack, sizeof(dualStack)) == -1)
         throw std::runtime_error { formattedError("setsockopt", errno) };
@@ -54,24 +60,14 @@ Socket Server::makeListener()
     if (bind(listener.fd(), info->ai_addr, info->ai_addrlen) == -1)
         throw std::runtime_error { formattedError("bind", errno) };
 
-    if (listen(listener.fd(), 5) == -1)
+    if (listen(listener.fd(), Settings::connectionBacklog) == -1)
         throw std::runtime_error { formattedError("listen", errno) };
 
     return listener;
 }
 
-Server::Server() : m_listener { makeListener() } {}
-
-void Server::serve() const
+void Server::handleClient(const Socket& client)
 {
-    std::cout << "Waiting for a client to connect...\n";
-
-    Socket client { accept(m_listener.fd(), nullptr, nullptr) };
-    if (client.fd() == -1)
-        std::cerr << formattedError("accept", errno);
-
-    std::cout << "Client connected\n";
-
     std::string httpReq { client.recvAll() };
 
     auto req { HTTP::parseRequest(httpReq) };
@@ -89,4 +85,18 @@ void Server::serve() const
     }
 
     sendResponse(client, *resp);
+}
+
+Server::Server() : m_listener { makeListener() }, m_pool { Settings::nthreads, handleClient } {}
+
+void Server::serve()
+{
+    while (true)
+    {
+        Socket client { accept(m_listener.fd(), nullptr, nullptr) };
+        if (client.fd() == -1)
+            std::cerr << formattedError("accept", errno);
+
+        m_pool.enqueue(std::move(client));
+    }
 }

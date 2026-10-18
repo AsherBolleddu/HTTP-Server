@@ -6,10 +6,11 @@
 class Socket
 {
 private:
-    static constexpr int invalidFD { -1 };
     int m_fd;
 
 public:
+    static constexpr int invalidFD { -1 };
+
     explicit Socket(int fd);
 
     int fd() const { return m_fd; }
