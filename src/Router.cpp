@@ -7,9 +7,35 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+
+namespace Helper
+{
+    std::optional<std::string_view> chooseEncoding(const std::unordered_map<std::string, std::string_view>& headers)
+    {
+        using namespace std::string_view_literals;
+        auto it(headers.find("accept-encoding"));
+        if (it == headers.end())
+            return std::nullopt;
+
+        for (const auto line : std::ranges::views::split(it->second, ","sv))
+        {
+            std::string_view scheme { line };
+            if (auto first { scheme.find_first_not_of(' ') }; first != std::string_view::npos)
+                scheme.remove_prefix(first);
+            if (auto last { scheme.find_last_not_of(' ') }; last != std::string_view::npos)
+                scheme.remove_suffix(scheme.size() - last - 1);
+            if (Settings::validSchemes.contains(scheme))
+                return scheme;
+        }
+
+        return std::nullopt;
+    }
+} // namespace Helper
 namespace Router
 {
     namespace
@@ -40,10 +66,11 @@ namespace Router
                 .body { data.info.value() },
             };
 
-            if (auto it { data.header.find("accept-encoding") }; it != data.header.end())
-                if (Settings::validSchemes.contains(it->second))
-                    resp.headers.insert({ "Content-Encoding", "gzip" });
+            auto encoding { Helper::chooseEncoding(data.header) };
+            if (!encoding)
+                return resp;
 
+            resp.headers.insert({ "Content-Encoding", std::string { *encoding } });
             return resp;
         }
 
