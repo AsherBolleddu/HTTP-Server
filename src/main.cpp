@@ -19,9 +19,6 @@ Config parseCommandLine(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
     std::signal(SIGPIPE, SIG_IGN);
-    // Flush after every std::cout / std::cerr
-    std::cout << std::unitbuf;
-    std::cerr << std::unitbuf;
 
     if ((argc - 1) % 2 != 0)
     {
